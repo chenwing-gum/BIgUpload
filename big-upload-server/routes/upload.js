@@ -15,7 +15,7 @@ const extractExt = (filename) =>
 
 // 返回已经上传的切片名列表
 const createUploadedList = async (fileHash) => {
-  console.log("fileHash --->", fileHash);
+  // console.log("fileHash --->", fileHash);
   return fse.existsSync(path.resolve(UPLOAD_DIR, `${fileHash}-chunks`))
     ? await fse.readdir(path.resolve(UPLOAD_DIR, `${fileHash}-chunks`))
     : [];
@@ -93,8 +93,8 @@ router.post("/merge", async (ctx, next) => {
 // 验证文件是否存在
 router.post("/verify", async (ctx, next) => {
   const { fileName, fileHash } = ctx.request.body;
-  console.log("fileName", fileName);
-  console.log("fileHash", fileHash);
+  // console.log("fileName", fileName);
+  // console.log("fileHash", fileHash);
   let shouldUpload = true;
   let msg = "文件不存在，需要上传";
   const ext = extractExt(fileName);

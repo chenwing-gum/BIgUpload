@@ -54,7 +54,7 @@ const controller = ref(null);
 // 判断文件是可以秒传
 async function VerifyUpload(fileName, fileHash) {
   const { data } = await verifyUpload(JSON.stringify({ fileName, fileHash }));
-  console.log("文件秒传判断", data);
+  // console.log("文件秒传判断", data);
   return data;
 }
 
@@ -69,7 +69,7 @@ const uploadPercentage = computed(() => {
 
 // 监听上传进度来判断是否合并
 watch(uploadPercentage, async (val) => {
-  console.log("进度", val);
+  // console.log("进度", val);
   if (val == 100) {
     await MergeChunks();
   }
@@ -181,7 +181,7 @@ function onProgress(item) {
 }
 // 上传文件切片
 async function UploadChunks(uploadedList = []) {
-  console.log("开始上传");
+  // console.log("开始上传");
   if (controller.value) {
     controller.value = null;
   }
@@ -217,7 +217,7 @@ function MergeChunks() {
 
 // 暂停上传
 function handlePause() {
-  console.log("中断上传", controller);
+  // console.log("中断上传", controller);
   requestList.value.forEach((element) => {
     controller.value.abort();
   });

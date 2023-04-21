@@ -11,6 +11,8 @@ const index = require("./routes/index");
 const users = require("./routes/users");
 const upload = require("./routes/upload");
 
+require('./schedule/chunkClearShedult')
+
 // error handler
 onerror(app);
 

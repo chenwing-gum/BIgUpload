@@ -68,15 +68,16 @@ const uploadPercentage = computed(() => {
 });
 
 // 监听上传进度来判断是否合并
-watch(uploadPercentage, async (val) => {
-  // console.log("进度", val);
-  if (val == 100) {
-    await MergeChunks();
-  }
-});
+// watch(uploadPercentage, async (val) => {
+//   // console.log("进度", val);
+//   if (val == 100) {
+//     await MergeChunks();
+//   }
+// });
 
 // 获取文件
 function handleFileChange(e) {
+  resetData()
   const [file] = e.target.files;
   // console.log(file);
   if (!file) {
@@ -179,6 +180,7 @@ function onProgress(item) {
     item.percentage = parseInt(String((e.loaded / e.total) * 100));
   };
 }
+
 // 上传文件切片
 async function UploadChunks(uploadedList = []) {
   // console.log("开始上传");
@@ -186,21 +188,93 @@ async function UploadChunks(uploadedList = []) {
     controller.value = null;
   }
   controller.value = new AbortController();
-  requestList.value = chunkList.value
-    .filter((chunk) => {
-      return !uploadedList.includes(chunk.chunkHash);
-    })
-    .map(async (item, index) => {
-      uploadChunks(
-        item,
-        onProgress(chunkList.value[chunkList.value.indexOf(item)]),
-        controller.value.signal
-      ).catch((err) => {
-        return;
-      });
-    });
+  requestList.value = chunkList.value.filter((chunk) => {
+    return !uploadedList.includes(chunk.chunkHash);
+  });
+  // .map(async (item, index) => {
+  //   uploadChunks(
+  //     item,
+  //     onProgress(chunkList.value[chunkList.value.indexOf(item)]),
+  //     controller.value.signal
+  //   ).catch((err) => {
+  //     return;
+  //   });
+  // });
 
-  await Promise.all(requestList.value)
+  // console.log("请求列表", requestList.value);
+  await sendRequest(requestList.value);
+
+  if (
+    uploadedList.length + requestList.value.length ==
+    chunkList.value.length
+  ) {
+    console.log("开始合并");
+    await MergeChunks();
+  }
+
+  // await Promise.all(requestList.value)
+}
+
+// 控制请求发送以及上传错误处理
+function sendRequest(form) {
+  return new Promise((resolve, reject) => {
+    const len = form.length;
+    let counter = 0; // 发送成功的请求数
+    const retryArr = [];
+    // let idx = 0
+
+    form.forEach((item) => (item.status = Status.wait));
+    // console.log(form);
+
+    const start = async () => {
+      while (counter < len && !isPaused.value) {
+        // max--;
+        let idx = form.findIndex(
+          (item) => item.status == Status.wait || item.status == Status.error
+        );
+        if (idx == -1) {
+          return reject();
+        }
+        console.log("开始", idx);
+        let { index } = form[idx];
+        await uploadChunks(
+          form[idx],
+          onProgress(chunkList.value[index]),
+          controller.value.signal
+        )
+          .then(() => {
+            console.log(idx, "上传成功");
+            form[idx].status = Status.done;
+            // max++;
+            counter++;
+            if (counter === len) {
+              resolve();
+            }
+          })
+          .catch((err) => {
+            console.log("err", err);
+            form[idx].status = Status.error;
+            if (typeof retryArr[index] !== "number") {
+              if (!isPaused) {
+                ElMessage.info(`第 ${index} 个片段上传失败，系统准备重试`);
+                retryArr[index] = 0;
+              }
+            }
+
+            // 次数累加
+            retryArr[index]++;
+            if (retryArr[index] > 3) {
+              ElMessage.error(
+                `第 ${index} 个片段重试多次无效，系统准备放弃上传`
+              );
+              form[idx].status = Status.fail;
+            }
+            // max++; //释放通道
+          });
+      }
+    };
+    start();
+  });
 }
 
 // 通知服务器合并切片

@@ -68,12 +68,13 @@ const uploadPercentage = computed(() => {
 });
 
 // 监听上传进度来判断是否合并
-// watch(uploadPercentage, async (val) => {
-//   // console.log("进度", val);
-//   if (val == 100) {
-//     await MergeChunks();
-//   }
-// });
+watch(uploadPercentage, async (val) => {
+  // console.log("进度", val);
+  if (val == 100) {
+    console.log('开始合并');
+    await MergeChunks();
+  }
+});
 
 // 获取文件
 function handleFileChange(e) {
@@ -195,13 +196,13 @@ async function UploadChunks(uploadedList = []) {
   // console.log("请求列表", requestList.value);
   await sendRequest(requestList.value);
 
-  if (
-    uploadedList.length + requestList.value.length ==
-    chunkList.value.length
-  ) {
-    console.log("开始合并");
-    await MergeChunks();
-  }
+  // if (
+  //   uploadedList.length + requestList.value.length ==
+  //   chunkList.value.length
+  // ) {
+  //   console.log("开始合并");
+  //   await MergeChunks();
+  // }
 }
 
 // 控制请求发送以及上传错误处理
@@ -266,8 +267,9 @@ function sendRequest(form, max = 4) {
                     `第 ${index} 个片段重试多次无效，系统准备放弃上传`
                   );
                   form[idx].status = Status.fail;
-
-                  Err = true
+                  form[idx].percentage = 0;
+                  // 终止当前所有请求
+                  Err = true;
                   requestArr.forEach((element) => {
                     controller.value.abort();
                   });
@@ -276,10 +278,10 @@ function sendRequest(form, max = 4) {
               })
           );
 
-          await Promise.all(requestArr)
+          await Promise.all(requestArr);
         }
       }
-      console.log("循环结束");
+      // console.log("循环结束");
     };
     start();
   });

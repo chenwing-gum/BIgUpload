@@ -64,9 +64,11 @@ async function mergeFileChunk(filePath, chunkDir, size) {
 
 // 上传chunk
 router.post("/chunk", koaBody({ multipart: true }), async (ctx, next) => {
-  // console.log('ctx ==>', ctx);
-  // console.log("data ==>", ctx.request.body);
-  // console.log("file -------->", ctx.request.files);
+  // // 模拟请求失败
+  // if (Math.random() > 0.5) {
+  // ctx.status = 500;
+  // return;
+  // }
   const { chunkHash, fileHash } = ctx.request.body;
   const { chunk } = ctx.request.files;
   // console.log('chunk ==>', chunk);

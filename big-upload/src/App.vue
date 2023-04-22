@@ -77,7 +77,7 @@ const uploadPercentage = computed(() => {
 
 // 获取文件
 function handleFileChange(e) {
-  resetData()
+  resetData();
   const [file] = e.target.files;
   // console.log(file);
   if (!file) {
@@ -191,15 +191,6 @@ async function UploadChunks(uploadedList = []) {
   requestList.value = chunkList.value.filter((chunk) => {
     return !uploadedList.includes(chunk.chunkHash);
   });
-  // .map(async (item, index) => {
-  //   uploadChunks(
-  //     item,
-  //     onProgress(chunkList.value[chunkList.value.indexOf(item)]),
-  //     controller.value.signal
-  //   ).catch((err) => {
-  //     return;
-  //   });
-  // });
 
   // console.log("请求列表", requestList.value);
   await sendRequest(requestList.value);
@@ -211,12 +202,10 @@ async function UploadChunks(uploadedList = []) {
     console.log("开始合并");
     await MergeChunks();
   }
-
-  // await Promise.all(requestList.value)
 }
 
 // 控制请求发送以及上传错误处理
-function sendRequest(form) {
+function sendRequest(form, max = 4) {
   return new Promise((resolve, reject) => {
     const len = form.length;
     let counter = 0; // 发送成功的请求数
@@ -228,49 +217,59 @@ function sendRequest(form) {
 
     const start = async () => {
       while (counter < len && !isPaused.value) {
-        // max--;
-        let idx = form.findIndex(
-          (item) => item.status == Status.wait || item.status == Status.error
-        );
-        if (idx == -1) {
-          return reject();
-        }
-        console.log("开始", idx);
-        let { index } = form[idx];
-        await uploadChunks(
-          form[idx],
-          onProgress(chunkList.value[index]),
-          controller.value.signal
-        )
-          .then(() => {
-            console.log(idx, "上传成功");
-            form[idx].status = Status.done;
-            // max++;
-            counter++;
-            if (counter === len) {
-              resolve();
-            }
-          })
-          .catch((err) => {
-            console.log("err", err);
-            form[idx].status = Status.error;
-            if (typeof retryArr[index] !== "number") {
-              if (!isPaused) {
-                ElMessage.info(`第 ${index} 个片段上传失败，系统准备重试`);
-                retryArr[index] = 0;
-              }
-            }
+        // 创建请求列表
+        let requestArr = [];
 
-            // 次数累加
-            retryArr[index]++;
-            if (retryArr[index] > 3) {
-              ElMessage.error(
-                `第 ${index} 个片段重试多次无效，系统准备放弃上传`
-              );
-              form[idx].status = Status.fail;
-            }
-            // max++; //释放通道
-          });
+        // 并发控制请求
+        for (let i = 0; i < max; i++) {
+          let idx = form.findIndex(
+            (item) => item.status == Status.wait || item.status == Status.error
+          );
+          if (idx == -1) {
+            return reject();
+          }
+          form[idx].status = Status.done;
+          console.log("开始", idx);
+
+          let { index } = form[idx];
+
+          requestArr.push(
+            uploadChunks(
+              form[idx],
+              onProgress(chunkList.value[index]),
+              controller.value.signal
+            )
+              .then(() => {
+                console.log(idx, "上传成功");
+                form[idx].status = Status.done;
+                counter++;
+                if (counter === len) {
+                  resolve();
+                }
+              })
+              .catch((err) => {
+                console.log("err", err);
+                form[idx].status = Status.error;
+                if (typeof retryArr[index] !== "number") {
+                  if (!isPaused) {
+                    ElMessage.info(`第 ${index} 个片段上传失败，系统准备重试`);
+                    retryArr[index] = 0;
+                  }
+                }
+
+                // 次数累加
+                retryArr[index]++;
+                if (retryArr[index] > 3) {
+                  ElMessage.error(
+                    `第 ${index} 个片段重试多次无效，系统准备放弃上传`
+                  );
+                  form[idx].status = Status.fail;
+                }
+              })
+          );
+
+          await Promise.all(requestArr)
+        }
       }
     };
     start();

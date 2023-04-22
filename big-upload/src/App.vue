@@ -45,10 +45,10 @@ const Status = { wait: 1, error: 2, done: 3, fail: 4 };
 const File = ref(null);
 const chunkList = ref([]);
 const requestList = ref([]);
-const worker = ref(null);
 const hash = ref("");
 const isPaused = ref(false);
 const hashPercentage = ref(0);
+// 请求控制器
 const controller = ref(null);
 
 // 判断文件是可以秒传
@@ -216,7 +216,8 @@ function sendRequest(form, max = 4) {
     // console.log(form);
 
     const start = async () => {
-      while (counter < len && !isPaused.value) {
+      let Err = false;
+      while (counter < len && !isPaused.value && !Err) {
         // 创建请求列表
         let requestArr = [];
 
@@ -226,10 +227,11 @@ function sendRequest(form, max = 4) {
             (item) => item.status == Status.wait || item.status == Status.error
           );
           if (idx == -1) {
-            return reject();
+            Err = true;
+            return;
           }
           form[idx].status = Status.done;
-          console.log("开始", idx);
+          // console.log("开始", idx);
 
           let { index } = form[idx];
 
@@ -240,7 +242,7 @@ function sendRequest(form, max = 4) {
               controller.value.signal
             )
               .then(() => {
-                console.log(idx, "上传成功");
+                // console.log(idx, "上传成功");
                 form[idx].status = Status.done;
                 counter++;
                 if (counter === len) {
@@ -248,10 +250,10 @@ function sendRequest(form, max = 4) {
                 }
               })
               .catch((err) => {
-                console.log("err", err);
+                // console.log("err-----》", err);
                 form[idx].status = Status.error;
                 if (typeof retryArr[index] !== "number") {
-                  if (!isPaused) {
+                  if (!isPaused.value) {
                     ElMessage.info(`第 ${index} 个片段上传失败，系统准备重试`);
                     retryArr[index] = 0;
                   }
@@ -264,6 +266,12 @@ function sendRequest(form, max = 4) {
                     `第 ${index} 个片段重试多次无效，系统准备放弃上传`
                   );
                   form[idx].status = Status.fail;
+
+                  Err = true
+                  requestArr.forEach((element) => {
+                    controller.value.abort();
+                  });
+                  requestArr = [];
                 }
               })
           );
@@ -271,6 +279,7 @@ function sendRequest(form, max = 4) {
           await Promise.all(requestArr)
         }
       }
+      console.log("循环结束");
     };
     start();
   });
